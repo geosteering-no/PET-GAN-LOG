@@ -1,6 +1,6 @@
 import numpy as np
 import os
-os.sys.path.append('../../../GAN-geosteering/gan_update')
+os.sys.path.append('../../../GAN-geosteering/gan_update') # assume that all packages are stored in a joint folder.
 from vector_to_log import FullModel
 import torch
 from copy import deepcopy
@@ -95,3 +95,27 @@ class GeoSim:
                     self.pred_data[prim_ind][key] = logs_np[:,extract_index,:].flatten()
 
         return self.pred_data
+
+
+weights_folder = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/em/{}.pth?ref_type=heads"
+scalers_folder = weights_folder
+full_em_model_file_name = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/em/checkpoint_770.pth?ref_type=heads"
+file_name = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/gan/netG_epoch_15000.pth"
+
+input_dict = {
+    'file_name':file_name,
+    'full_em_model_file_name':full_em_model_file_name,
+    'scalers_folder':scalers_folder
+    }
+
+sim = GeoSim(input_dict)
+
+sim.l_prim = [0]
+sim.all_data_types = ["('6kHz', '83ft')","('12kHz', '83ft')","('24kHz', '83ft')","('24kHz', '43ft')","('48kHz', '43ft')","('96kHz', '43ft')"]
+
+sim.setup_fwd_run()
+
+latent_model = np.random.normal(size=60)
+
+pred = sim.run_fwd_sim({'x':latent_model})
+J = sim.run_Jacobian({'x':latent_model})
