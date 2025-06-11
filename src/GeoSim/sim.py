@@ -1,7 +1,6 @@
 import numpy as np
 import os
-os.sys.path.append('../../../GAN-geosteering/gan_update') # assume that all packages are stored in a joint folder.
-from vector_to_log import FullModel
+from NeuralSim.vector_to_log import FullModel
 import torch
 from copy import deepcopy
 
@@ -47,14 +46,12 @@ class GeoSim:
             'UHRA', 'UHRP',
             'UHAA', 'UHAP'
         ]
-        self.tool_configs = [f'{f} khz - {s} ft' for f, s in
-                        zip([6., 12., 24., 24., 48., 96.], [83., 83., 83., 43., 43., 43.])]
 
     def run_fwd_sim(self, state, member_i):
-        success = False
+
         state['member_i'] = member_i
-        while not success:
-            self.pred_data = self.call_sim(**state)
+
+        self.pred_data = self.call_sim(**state)
 
         return self.pred_data
 
@@ -77,12 +74,15 @@ class GeoSim:
             for key in self.all_data_types:
                 self.pred_data[ind][key] = np.zeros((1, 1))
 
-    def call_sim(self, index_vector, **kwargs):
+        # Initialize the index_vector for the call_sim method
+        self.index_vector = torch.full((1, 1), fill_value=32, dtype=torch.long).to(device)
+
+    def call_sim(self, **kwargs):
         my_latent_vec_np = kwargs['x']
         my_latent_tensor = torch.tensor(my_latent_vec_np, dtype=torch.float32).unsqueeze(0).to(
             device)  # Add batch dimension and move to device
 
-        logs = self.NNmodel.forward(my_latent_tensor,index_vector,output_transien_results=False)
+        logs = self.NNmodel.forward(my_latent_tensor,self.index_vector,output_transien_results=False)
 
         logs_np = logs.cpu().detach().numpy()
 #        cols, setups, log_types = logs_np.shape
@@ -96,26 +96,27 @@ class GeoSim:
 
         return self.pred_data
 
+if __name__ == "__main__":
+    weights_folder = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/em/{}.pth?ref_type=heads"
+    scalers_folder = weights_folder
+    full_em_model_file_name = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/em/checkpoint_770.pth?ref_type=heads"
+    file_name = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/gan/netG_epoch_15000.pth"
 
-weights_folder = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/em/{}.pth?ref_type=heads"
-scalers_folder = weights_folder
-full_em_model_file_name = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/em/checkpoint_770.pth?ref_type=heads"
-file_name = "https://gitlab.norceresearch.no/saly/image_to_log_weights/-/raw/master/gan/netG_epoch_15000.pth"
+    input_dict = {
+        'file_name':file_name,
+        'full_em_model_file_name':full_em_model_file_name,
+        'scalers_folder':scalers_folder
+         }
 
-input_dict = {
-    'file_name':file_name,
-    'full_em_model_file_name':full_em_model_file_name,
-    'scalers_folder':scalers_folder
-    }
+    sim = GeoSim(input_dict)
 
-sim = GeoSim(input_dict)
+    sim.l_prim = [0]
+    sim.all_data_types = ["('6kHz', '83ft')","('12kHz', '83ft')","('24kHz', '83ft')","('24kHz', '43ft')","('48kHz', '43ft')","('96kHz', '43ft')"]
+    sim.tool_configs = sim.all_data_types
 
-sim.l_prim = [0]
-sim.all_data_types = ["('6kHz', '83ft')","('12kHz', '83ft')","('24kHz', '83ft')","('24kHz', '43ft')","('48kHz', '43ft')","('96kHz', '43ft')"]
+    sim.setup_fwd_run({'bah':10})
 
-sim.setup_fwd_run()
+    latent_model = np.random.normal(size=60)
 
-latent_model = np.random.normal(size=60)
-
-pred = sim.run_fwd_sim({'x':latent_model})
-J = sim.run_Jacobian({'x':latent_model})
+    pred = sim.run_fwd_sim({'x':latent_model},member_i=0)
+    print(pred[0])
