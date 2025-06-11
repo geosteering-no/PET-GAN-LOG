@@ -22,11 +22,16 @@ class GeoSim:
         input_shape = (3,128) # These are fixed
         output_shape = (6,18)
 
+        for k, v in input_dict.items(): # populate the input
+            setattr(self, k, v)
+
+        self.input_dict = input_dict # also store this
+        self.redund_sim = None
 
         self.NNmodel = FullModel(latent_size=vec_size,
-                    gan_save_file=input_dict['file_name'],
-                    proxi_save_file=input_dict['full_em_model_file_name'],
-                    proxi_scalers=input_dict['scalers_folder'],
+                    gan_save_file=self.file_name,
+                    proxi_save_file=self.full_em_model_file_name,
+                    proxi_scalers=self.scalers_folder,
                     proxi_input_shape=input_shape,
                     proxi_output_shape=output_shape,
                     gan_output_height=64,
@@ -47,6 +52,20 @@ class GeoSim:
             'UHAA', 'UHAP'
         ]
 
+        self.true_prim = [self.input_dict['reporttype'], self.input_dict['reportpoint']]
+
+        self.true_order = [self.input_dict['reporttype'], self.input_dict['reportpoint']]
+        self.all_data_types = self.input_dict['datatype']
+        self.tool_configs = self.all_data_types # convert to string for consistency
+        self.l_prim = [int(i) for i in range(len(self.true_prim[1]))]
+
+    def update_bit_pos(self, bit_pos):
+        """
+        Update the bit position for the simulation.
+        :param bit_pos: List of tuples, where each tuple contains (bit_position, vector_size).
+        """
+        self.bit_pos = bit_pos
+
     def run_fwd_sim(self, state, member_i):
 
         state['member_i'] = member_i
@@ -59,14 +78,14 @@ class GeoSim:
         my_latent_vec_np = kwargs['x']
         my_latent_tensor = torch.tensor(my_latent_vec_np.tolist(), dtype=torch.float32, requires_grad=True).unsqueeze(
             0).to(device)
-        index_tensor_bw = torch.full((1, 2), fill_value=32, dtype=torch.long).to(device)
+        index_tensor_bw = torch.full((1, self.bit_pos[0][1]), fill_value=self.bit_pos[0][0], dtype=torch.long).to(device)
         jacobean = torch.autograd.functional.jacobian(lambda x: self.full_model.forward(x, index_vector=index_tensor_bw),
                                                       my_latent_tensor,
                                                       create_graph=False,
                                                       vectorize=True)
         return jacobean.cpu().detach().numpy()
 
-    def setup_fwd_run(self,kwargs):
+    def setup_fwd_run(self,**kwargs):
 
         self.__dict__.update(kwargs)  # parse kwargs input into class attributes
         self.pred_data = [deepcopy({}) for _ in range(max(self.l_prim)+1)]
@@ -75,7 +94,7 @@ class GeoSim:
                 self.pred_data[ind][key] = np.zeros((1, 1))
 
         # Initialize the index_vector for the call_sim method
-        self.index_vector = torch.full((1, 1), fill_value=32, dtype=torch.long).to(device)
+        self.index_vector = torch.full((1, self.bit_pos[0][1]), fill_value=self.bit_pos[0][0], dtype=torch.long).to(device)
 
     def call_sim(self, **kwargs):
         my_latent_vec_np = kwargs['x']
@@ -92,7 +111,7 @@ class GeoSim:
             for key in self.all_data_types:
                 if self.pred_data[prim_ind][key] is not None:  # Obs. data at assim. step
                     extract_index = self.tool_configs.index(key)
-                    self.pred_data[prim_ind][key] = logs_np[:,extract_index,:].flatten()
+                    self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1]-1,extract_index,-8:].flatten()
 
         return self.pred_data
 
