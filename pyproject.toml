@@ -1,0 +1,14 @@
+[project]
+name = "PET-GAN-LOG"
+version = "0.0.1"
+authors = [
+  { name="Kristian Fossum", email="krfo@norceresearch.no" },
+]
+description = "PET implementation for coupled neural networks for mapping latent vector to EM log"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+  "numpy",
+  "torch",
+  "matplotlib"
+]
