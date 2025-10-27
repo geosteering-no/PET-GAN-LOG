@@ -28,17 +28,22 @@ class GeoSim:
         self.input_dict = input_dict # also store this
         self.redund_sim = None
 
+        # TODO - this is a weird convension which is held for backward-compatibility
+        gan_swap_orientation = True
+        if 'swap_gan_output_dims' in input_dict:
+            gan_swap_orientation = input_dict['swap_gan_output_dims']
+
         self.NNmodel = FullModel(latent_size=vec_size,
-                    gan_save_file=self.file_name,
-                    proxi_save_file=self.full_em_model_file_name,
-                    proxi_scalers=self.scalers_folder,
-                    proxi_input_shape=input_shape,
-                    proxi_output_shape=output_shape,
-                    gan_output_height=64,
-                    num_img_channels=6,
-                    gan_correct_orientation=True,
-                    device=device
-                    )
+                                 gan_save_file=self.file_name,
+                                 proxi_save_file=self.full_em_model_file_name,
+                                 proxi_scalers=self.scalers_folder,
+                                 proxi_input_shape=input_shape,
+                                 proxi_output_shape=output_shape,
+                                 gan_output_height=64,
+                                 num_img_channels=6,
+                                 gan_correct_orientation=gan_swap_orientation,
+                                 device=device
+                                 )
 
         self.names = [
             'real(xx)', 'img(xx)',
