@@ -4,6 +4,7 @@ from NeuralSim.vector_to_log import FullModel
 import torch
 from copy import deepcopy
 
+# TODO the device should be passed as an argument
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class GeoSim:
