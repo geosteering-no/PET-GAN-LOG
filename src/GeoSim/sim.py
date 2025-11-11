@@ -100,7 +100,13 @@ class GeoSim:
                 self.pred_data[ind][key] = np.zeros((1, 1))
 
         # Initialize the index_vector for the call_sim method
-        self.index_vector = torch.full((1, self.bit_pos[0][1]), fill_value=self.bit_pos[0][0], dtype=torch.long).to(device)
+        # todo Sergey has added 1 because bit_pos[0][1] can be anything
+        # todo we need to change it since now we simulate all log values from 0 to the end of it
+        # We need to be consistent with
+        # def convert_to_resistivity_format(self, images, index_vector):
+        self.index_vector = torch.full((1, self.bit_pos[0][1]+1),
+                                       fill_value=self.bit_pos[0][0],
+                                       dtype=torch.long).to(device)
 
     def call_sim(self, **kwargs):
         my_latent_vec_np = kwargs['x']
@@ -117,7 +123,10 @@ class GeoSim:
             for key in self.all_data_types:
                 if self.pred_data[prim_ind][key] is not None:  # Obs. data at assim. step
                     extract_index = self.tool_configs.index(key)
-                    self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1]-1,extract_index,-8:].flatten()
+                    # todo Sergey removed -1 in "self.bit_pos[0][1]-1"
+                    # the reason for this is that bit pos can be anything really
+                    # with 0-indexing no point to have it with -1
+                    self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1],extract_index,-8:].flatten()
 
         return self.pred_data
 
