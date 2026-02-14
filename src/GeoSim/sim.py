@@ -34,6 +34,11 @@ class GeoSim:
         if 'swap_gan_output_dims' in input_dict:
             gan_swap_orientation = input_dict['swap_gan_output_dims']
 
+        if self.input_dict['datatype'] == ['point']:
+            direct_em_model = True
+        else:
+            direct_em_model = False
+
         self.NNmodel = FullModel(latent_size=vec_size,
                                  gan_save_file=self.file_name,
                                  proxi_save_file=self.full_em_model_file_name,
@@ -43,7 +48,8 @@ class GeoSim:
                                  gan_output_height=64,
                                  num_img_channels=6,
                                  gan_correct_orientation=gan_swap_orientation,
-                                 device=device
+                                 device=device,
+                                 direct_em_model=direct_em_model
                                  )
 
         self.names = [
@@ -123,10 +129,13 @@ class GeoSim:
             for key in self.all_data_types:
                 if self.pred_data[prim_ind][key] is not None:  # Obs. data at assim. step
                     extract_index = self.tool_configs.index(key)
+                    if key == 'point':
+                            self.pred_data[prim_ind][key] = logs_np.flatten()
+                    else:
                     # todo Sergey removed -1 in "self.bit_pos[0][1]-1"
                     # the reason for this is that bit pos can be anything really
                     # with 0-indexing no point to have it with -1
-                    self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1],extract_index,-8:].flatten()
+                        self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1],extract_index,-8:].flatten()
 
         return self.pred_data
 
@@ -139,16 +148,21 @@ if __name__ == "__main__":
     input_dict = {
         'file_name':file_name,
         'full_em_model_file_name':full_em_model_file_name,
-        'scalers_folder':scalers_folder
+        'scalers_folder':scalers_folder,
+        'datatype': ['point'],
+        'reporttype': ['point'],
+        'reportpoint': [0]
+        #'datatype': ["('6kHz', '83ft')","('12kHz', '83ft')",
+        #            "('24kHz', '83ft')","('24kHz', '43ft')","('48kHz', '43ft')","('96kHz', '43ft')"]
          }
 
     sim = GeoSim(input_dict)
 
     sim.l_prim = [0]
-    sim.all_data_types = ["('6kHz', '83ft')","('12kHz', '83ft')","('24kHz', '83ft')","('24kHz', '43ft')","('48kHz', '43ft')","('96kHz', '43ft')"]
+    sim.all_data_types = input_dict['datatype']
     sim.tool_configs = sim.all_data_types
 
-    sim.setup_fwd_run({'bah':10})
+    sim.setup_fwd_run(**{'bit_pos':[[32,0]]})
 
     latent_model = np.random.normal(size=60)
 
