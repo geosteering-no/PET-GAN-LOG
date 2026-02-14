@@ -110,7 +110,7 @@ class GeoSim:
         # todo we need to change it since now we simulate all log values from 0 to the end of it
         # We need to be consistent with
         # def convert_to_resistivity_format(self, images, index_vector):
-        self.index_vector = torch.full((1, self.bit_pos[0][1]+1),
+        self.index_vector = torch.full((1, self.bit_pos[0][1]),
                                        fill_value=self.bit_pos[0][0],
                                        dtype=torch.long).to(device)
 
