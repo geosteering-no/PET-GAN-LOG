@@ -100,42 +100,61 @@ class GeoSim:
     def setup_fwd_run(self,**kwargs):
 
         self.__dict__.update(kwargs)  # parse kwargs input into class attributes
-        self.pred_data = [deepcopy({}) for _ in range(max(self.l_prim)+1)]
-        for ind in range(max(self.l_prim)+1):
-            for key in self.all_data_types:
-                self.pred_data[ind][key] = np.zeros((1, 1))
+        # pred_data will be initialized in call_sim once we know the batch size
+        self.pred_data = None
 
         # Initialize the index_vector for the call_sim method
         # todo Sergey has added 1 because bit_pos[0][1] can be anything
         # todo we need to change it since now we simulate all log values from 0 to the end of it
         # We need to be consistent with
         # def convert_to_resistivity_format(self, images, index_vector):
-        self.index_vector = torch.full((1, self.bit_pos[0][1]+1),
-                                       fill_value=self.bit_pos[0][0],
-                                       dtype=torch.long).to(device)
+        #self.index_vector = torch.full((10, self.bit_pos[0][1]+1),
+        #                               fill_value=self.bit_pos[0][0],
+        #                               dtype=torch.long).to(device)
+        #self.index_vector = torch.full((1, self.bit_pos[0][1]+1),
+        #                               fill_value=self.bit_pos[0][0],
+        #                               dtype=torch.long).to(device)
 
     def call_sim(self, **kwargs):
-        my_latent_vec_np = kwargs['x']
-        my_latent_tensor = torch.tensor(my_latent_vec_np, dtype=torch.float32).unsqueeze(0).to(
-            device)  # Add batch dimension and move to device
+        #my_latent_vec_np = np.tile(kwargs['x'],(10,1))
+        my_latent_vec_np = kwargs['x']        
+
+        if my_latent_vec_np.ndim == 1:
+            my_latent_tensor = torch.tensor(my_latent_vec_np, dtype=torch.float32).unsqueeze(0).to(
+                device)  # Add batch dimension and move to device
+        else:
+            my_latent_tensor = torch.tensor(my_latent_vec_np, dtype=torch.float32).to(device)
+
+        self.index_vector = torch.full((my_latent_tensor.shape[0], self.bit_pos[0][1]+1),
+                                       fill_value=self.bit_pos[0][0],
+                                       dtype=torch.long).to(device)
 
         logs = self.NNmodel.forward(my_latent_tensor,self.index_vector,output_transien_results=False)
 
         logs_np = logs.cpu().detach().numpy()
-#        cols, setups, log_types = logs_np.shape
+        batch_size = logs_np.shape[0]
 
-        for prim_ind in range(max(self.l_prim)+1):
-            # Loop over all keys in pred_data (all data types)
-            for key in self.all_data_types:
-                if self.pred_data[prim_ind][key] is not None:  # Obs. data at assim. step
+        # Initialize pred_data with batch dimension as outermost index
+        self.pred_data = []
+        for _ in range(batch_size):
+            sample_data = [deepcopy({}) for _ in range(max(self.l_prim)+1)]
+            for ind in range(max(self.l_prim)+1):
+                for key in self.all_data_types:
+                    sample_data[ind][key] = None
+            self.pred_data.append(sample_data)
+
+        for sample_idx in range(batch_size):
+            for prim_ind in range(max(self.l_prim)+1):
+                # Loop over all keys in pred_data (all data types)
+                for key in self.all_data_types:
                     extract_index = self.tool_configs.index(key)
                     if key == 'point':
-                            self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1],:].flatten()
+                        self.pred_data[sample_idx][prim_ind][key] = logs_np[sample_idx, self.bit_pos[0][1], :].flatten()
                     else:
-                    # todo Sergey removed -1 in "self.bit_pos[0][1]-1"
-                    # the reason for this is that bit pos can be anything really
-                    # with 0-indexing no point to have it with -1
-                        self.pred_data[prim_ind][key] = logs_np[self.bit_pos[0][1],extract_index,-8:].flatten()
+                        # todo Sergey removed -1 in "self.bit_pos[0][1]-1"
+                        # the reason for this is that bit pos can be anything really
+                        # with 0-indexing no point to have it with -1
+                        self.pred_data[sample_idx][prim_ind][key] = logs_np[sample_idx, self.bit_pos[0][1], extract_index, -8:].flatten()
 
         return self.pred_data
 
